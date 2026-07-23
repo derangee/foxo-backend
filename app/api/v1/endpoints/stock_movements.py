@@ -79,7 +79,9 @@ async def list_movements(
     size: int = Query(20, ge=1, le=100, description="Items per page"),
     movement_type: MovementType | None = Query(None, description="Filter by movement type"),
     order: Literal["asc", "desc"] = Query(
-        "desc", description="Order by time: 'desc' (newest first) or 'asc'"
+        "asc",
+        description="Time order: 'asc' = chronological/oldest-first (default), "
+        "'desc' = newest-first",
     ),
     service: StockMovementService = Depends(get_stock_movement_service),
 ) -> APIResponse[Page[MovementRead]]:

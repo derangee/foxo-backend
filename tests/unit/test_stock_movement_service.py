@@ -90,15 +90,23 @@ class TestTransactionBehavior:
 
 
 class TestHistory:
-    async def test_orders_newest_first_and_filters(self, product_service, movement_service):
+    async def test_orders_chronologically_by_default_and_filters(
+        self, product_service, movement_service
+    ):
         product = await _product(product_service)
         await movement_service.restock(product.id, 50)
         await movement_service.sell(product.id, 10)
         await movement_service.restock(product.id, 5)
 
+        # Default order is chronological (oldest first).
         items, total = await movement_service.history(product.id, page=1, size=20)
         assert total == 3
-        assert items[0].quantity_change == 5  # newest first
+        assert items[0].quantity_change == 50  # oldest first
+        assert items[-1].quantity_change == 5  # newest last
+
+        # Newest-first is available on request.
+        items, _ = await movement_service.history(product.id, page=1, size=20, ascending=False)
+        assert items[0].quantity_change == 5
 
         items, total = await movement_service.history(
             product.id, page=1, size=20, movement_type=MovementType.RESTOCK

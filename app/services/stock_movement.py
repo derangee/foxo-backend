@@ -52,7 +52,7 @@ class StockMovementService:
         page: int,
         size: int,
         movement_type: MovementType | None = None,
-        ascending: bool = False,
+        ascending: bool = True,
     ) -> tuple[Sequence[StockMovement], int]:
         # Fail fast with a 404 if the product does not exist, rather than
         # returning an empty page that hides a bad id.

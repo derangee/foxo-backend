@@ -54,7 +54,9 @@ class TestHistory:
         response = await client.get(f"/api/v1/products/{product['id']}/movements")
         data = response.json()["data"]
         assert data["total"] == 2
-        assert data["items"][0]["quantity_change"] == -10  # newest first
+        # Default order is chronological (oldest first): restock (+50) before sale (-10).
+        assert data["items"][0]["quantity_change"] == 50
+        assert data["items"][-1]["quantity_change"] == -10
 
     async def test_history_type_filter(self, client):
         product = await create_product(client, sku="SKU-1")

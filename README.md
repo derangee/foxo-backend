@@ -11,6 +11,7 @@ Built with **FastAPI**, **async SQLAlchemy 2.0**, and **PostgreSQL**.
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [Requirements Coverage](#requirements-coverage)
 - [Architecture](#architecture)
 - [Technology Stack](#technology-stack)
 - [Folder Structure](#folder-structure)
@@ -42,6 +43,44 @@ single database transaction. This gives two guarantees:
    product cannot oversell or lose updates.
 2. **Auditability** — the movement ledger is append-only and reconciles exactly
    with on-hand stock (`SUM(quantity_change) == quantity`).
+
+## Requirements Coverage
+
+A direct map from the assignment brief to the implementation and the tests that
+prove it, for quick evaluation.
+
+### Core requirements (pass/fail)
+
+| Requirement | Implementation | Verified by |
+| --- | --- | --- |
+| Product has unique **SKU**, **Name**, **Quantity on Hand** | [`models/product.py`](app/models/product.py) — unique `sku`, `name`, `quantity` | `tests/unit/test_product_service.py` |
+| Movement types **RESTOCK / SALE / ADJUSTMENT** | [`models/enums.py`](app/models/enums.py), [`services/stock_movement.py`](app/services/stock_movement.py) | `tests/unit/test_stock_movement_service.py` |
+| **ADJUSTMENT requires a reason** | [`schemas/stock_movement.py`](app/schemas/stock_movement.py) — `AdjustmentRequest.reason` (required) | `test_schemas.py`, `test_stock_movements_api.py` |
+| A **SALE cannot drop quantity below zero** | Service pre-check + DB `CHECK (quantity >= 0)` | `test_stock_movement_service.py` (`TestNegativeStockRejection`) |
+| Movement records **type, quantity delta, timestamp** | `movement_type`, `quantity_change` (signed delta), `created_at` | — |
+| Movements are **never modified or deleted** | Append-only repository; no update/delete route exists | (by construction) |
+| **CRUD for products** | [`endpoints/products.py`](app/api/v1/endpoints/products.py) | `test_products_api.py` |
+| **Record a movement, updating quantity in the same transaction** | [`_apply_movement`](app/services/stock_movement.py) — one atomic transaction | `test_stock_movement_service.py` (`TestTransactionBehavior`) |
+| **View full movement history, ordered chronologically** | `GET /products/{id}/movements` (chronological/oldest-first by default) | `test_stock_movements_api.py` |
+
+### Evaluation focus
+
+| Focus | How it is addressed |
+| --- | --- |
+| Transactions keep quantity & log in sync | Quantity update and movement insert commit **atomically**; the invariant `SUM(quantity_change) == quantity` is asserted in tests |
+| Data consistency | Row-level locking on movements + database constraints as a backstop |
+| "Never go negative" | Rejected in the service **and** enforced by a `CHECK` constraint |
+| Immutability of history | No update or delete path for movements |
+| Separation of product vs movement log | Distinct models, tables, repositories, and services |
+
+### Bonus (all four implemented)
+
+| Bonus | Status | Where |
+| --- | --- | --- |
+| Block product deletion when movements exist (deactivate instead) | ✅ | Guarded `DELETE` + `/activate` and `/deactivate` |
+| Pagination on movement history | ✅ | `page` / `size` on the history endpoint |
+| Optimistic locking (version column) | ✅ | `Product.version` + `expected_version` on `PATCH` |
+| Low-stock threshold alert endpoint | ✅ | `GET /products/low-stock?threshold=N` |
 
 ## Architecture
 
@@ -221,7 +260,7 @@ Base path: `/api/v1`. All responses use a consistent envelope
 | POST | `/products/{id}/restock` | Increase stock | 201 |
 | POST | `/products/{id}/sale` | Decrease stock (rejects oversell) | 201 |
 | POST | `/products/{id}/adjust` | Signed correction (reason required) | 201 |
-| GET | `/products/{id}/movements` | Movement history (paginated, filterable) | 200 |
+| GET | `/products/{id}/movements` | Full movement history — chronological, paginated, filterable | 200 |
 
 ### Examples
 
@@ -373,17 +412,19 @@ exceptions carry an HTTP status and a stable machine-readable code:
 
 ## System Design Reflection
 
-### 1. Two warehouse terminals submit a SALE at nearly the same time — what could go wrong, and how do we solve it?
+### 1. If two warehouse terminals recorded a SALE for the same product at nearly the same instant, what could go wrong with your current implementation, and how would you fix it?
 
-**The hazard: a lost update (race condition).** Selling is a read-modify-write:
-read `quantity`, subtract, write it back, and record a movement. If two terminals
-run this concurrently without coordination, both read the same starting value
-(say `10`), each computes its own new value (`10 - 6 = 4` and `10 - 7 = 3`), and
-the second write silently overwrites the first. One sale is effectively lost,
-stock is wrong, and the ledger no longer reconciles — in the worst case we oversell
-into negative inventory.
+**Short answer:** the danger is a *lost update*, and the current implementation
+already prevents it with a row-level lock, backed by a database check constraint.
 
-**How this service solves it (layered):**
+**The hazard.** Selling is a read-modify-write: read `quantity`, subtract, write it
+back, and record a movement. Two terminals running this concurrently *without*
+coordination would both read the same starting value (say `10`), each compute its
+own new value (`10 - 6 = 4` and `10 - 7 = 3`), and the second write would silently
+overwrite the first. One sale is lost, stock is wrong, the ledger no longer
+reconciles — and in the worst case we oversell into negative inventory.
+
+**How the current implementation fixes it (layered):**
 
 1. **Pessimistic row lock (primary).** Each movement locks the product row with
    `SELECT ... FOR UPDATE`. The second transaction blocks until the first commits,
@@ -422,7 +463,7 @@ invariant at the database with a check constraint, and keep the update atomic �
 correctness first, with a clear, documented path to a lock-free decrement if
 write throughput on a single product ever demands it.
 
-### 2. How would the architecture evolve from one warehouse to fifty?
+### 2. How would your design change if the company grew from a single warehouse to 50 warehouses, each with its own stock?
 
 Today `quantity` lives on the product, implying a single stockroom. Scaling to many
 warehouses means **stock becomes a property of (product, warehouse), not of the
