@@ -1,0 +1,19 @@
+"""Shared API dependencies.
+
+Assembles the repository/service graph for each request. FastAPI caches
+``get_session`` within a request, so the repository and service share one
+session (and therefore one transaction).
+"""
+
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_session
+from app.repositories.product import ProductRepository
+from app.services.product import ProductService
+
+
+def get_product_service(
+    session: AsyncSession = Depends(get_session),
+) -> ProductService:
+    return ProductService(session, ProductRepository(session))
