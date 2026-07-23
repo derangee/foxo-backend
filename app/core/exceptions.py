@@ -45,6 +45,18 @@ class DuplicateSKUError(ConflictError):
         super().__init__(message=f"A product with SKU '{sku}' already exists.")
 
 
+class InsufficientStockError(ConflictError):
+    error_code = "insufficient_stock"
+
+    def __init__(self, product_id: int, available: int, requested: int):
+        super().__init__(
+            message=(
+                f"Insufficient stock for product {product_id}: "
+                f"requested {requested}, available {available}."
+            )
+        )
+
+
 class ProductHasMovementsError(ConflictError):
     error_code = "product_has_movements"
 

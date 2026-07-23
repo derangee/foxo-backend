@@ -24,6 +24,18 @@ class ProductRepository:
     async def get_by_id(self, product_id: int) -> Product | None:
         return await self._session.get(Product, product_id)
 
+    async def get_for_update(self, product_id: int) -> Product | None:
+        """Fetch a product with a row-level lock (SELECT ... FOR UPDATE).
+
+        Serializes concurrent stock movements against the same product so that
+        the read-modify-write of ``quantity`` cannot lose updates. On backends
+        without row locking (e.g. SQLite) this degrades to a plain read.
+        """
+        result = await self._session.execute(
+            select(Product).where(Product.id == product_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_sku(self, sku: str) -> Product | None:
         result = await self._session.execute(select(Product).where(Product.sku == sku))
         return result.scalar_one_or_none()
