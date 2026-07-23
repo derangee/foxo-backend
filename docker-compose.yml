@@ -1,0 +1,22 @@
+# Local development dependencies. Brings up a PostgreSQL instance that matches
+# the DATABASE_URL in .env.example. Run with: docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: foxo-postgres
+    environment:
+      POSTGRES_USER: foxo
+      POSTGRES_PASSWORD: foxo
+      POSTGRES_DB: foxo_inventory
+    ports:
+      - "5432:5432"
+    volumes:
+      - foxo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foxo -d foxo_inventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  foxo_pgdata:
