@@ -6,11 +6,13 @@ produced centrally by the exception handlers.
 """
 
 import math
+from collections.abc import Sequence
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T")
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class APIResponse(BaseModel, Generic[T]):
@@ -49,3 +51,26 @@ class ErrorResponse(BaseModel):
     success: bool = False
     message: str
     error: ErrorDetail
+
+
+def paginated_response(
+    model: type[ModelT],
+    *,
+    items: Sequence[object],
+    total: int,
+    page: int,
+    size: int,
+    message: str = "OK",
+) -> "APIResponse[Page[ModelT]]":
+    """Build a standard paginated envelope from ORM rows.
+
+    Centralizes the "validate each row + wrap in Page + wrap in APIResponse"
+    pattern shared by every list endpoint.
+    """
+    page_obj = Page.create(
+        items=[model.model_validate(item) for item in items],
+        total=total,
+        page=page,
+        size=size,
+    )
+    return APIResponse(message=message, data=page_obj)

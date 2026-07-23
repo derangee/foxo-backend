@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import get_stock_movement_service
 from app.models.enums import MovementType
-from app.schemas.common import APIResponse, Page
+from app.schemas.common import APIResponse, Page, paginated_response
 from app.schemas.stock_movement import (
     AdjustmentRequest,
     MovementRead,
@@ -90,10 +90,4 @@ async def list_movements(
         movement_type=movement_type,
         ascending=order == "asc",
     )
-    page_data = Page.create(
-        items=[MovementRead.model_validate(item) for item in items],
-        total=total,
-        page=page,
-        size=size,
-    )
-    return APIResponse(data=page_data)
+    return paginated_response(MovementRead, items=items, total=total, page=page, size=size)

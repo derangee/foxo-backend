@@ -18,7 +18,10 @@ _MAX_QUANTITY = 1_000_000
 class QuantityMovementRequest(BaseModel):
     """Payload for RESTOCK and SALE (positive magnitude)."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={"examples": [{"quantity": 100, "reason": "Supplier delivery"}]},
+    )
 
     quantity: int = Field(gt=0, le=_MAX_QUANTITY, description="Positive quantity magnitude")
     reason: str | None = Field(default=None, max_length=500)
@@ -27,7 +30,12 @@ class QuantityMovementRequest(BaseModel):
 class AdjustmentRequest(BaseModel):
     """Payload for ADJUSTMENT (signed change, reason required)."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "examples": [{"quantity_change": -3, "reason": "Damaged during handling"}]
+        },
+    )
 
     quantity_change: int = Field(
         description="Signed, non-zero change to apply to stock (e.g. -3 or +10)"

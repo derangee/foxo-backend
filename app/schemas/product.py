@@ -15,7 +15,19 @@ SKU_PATTERN = r"^[A-Za-z0-9._-]+$"
 
 
 class ProductCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "sku": "WIDGET-001",
+                    "name": "Standard Widget",
+                    "description": "A dependable widget.",
+                    "price": "19.99",
+                }
+            ]
+        },
+    )
 
     sku: str = Field(min_length=1, max_length=64, pattern=SKU_PATTERN)
     name: str = Field(min_length=1, max_length=255)

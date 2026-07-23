@@ -18,5 +18,18 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build: .
+    container_name: foxo-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Reach postgres via the compose service name.
+      DATABASE_URL: postgresql+asyncpg://foxo:foxo@db:5432/foxo_inventory
+      APP_ENV: production
+    ports:
+      - "8000:8000"
+
 volumes:
   foxo_pgdata:

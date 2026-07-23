@@ -8,7 +8,7 @@ produced centrally by the registered exception handlers.
 from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import get_product_service
-from app.schemas.common import APIResponse, Page
+from app.schemas.common import APIResponse, Page, paginated_response
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.services.product import ProductService
 
@@ -44,13 +44,7 @@ async def low_stock(
     items, total = await service.low_stock(
         threshold=threshold, page=page, size=size, active_only=active_only
     )
-    page_data = Page.create(
-        items=[ProductRead.model_validate(item) for item in items],
-        total=total,
-        page=page,
-        size=size,
-    )
-    return APIResponse(data=page_data)
+    return paginated_response(ProductRead, items=items, total=total, page=page, size=size)
 
 
 @router.get(
@@ -78,13 +72,7 @@ async def list_products(
     service: ProductService = Depends(get_product_service),
 ) -> APIResponse[Page[ProductRead]]:
     items, total = await service.list(page=page, size=size, active_only=active_only)
-    page_data = Page.create(
-        items=[ProductRead.model_validate(item) for item in items],
-        total=total,
-        page=page,
-        size=size,
-    )
-    return APIResponse(data=page_data)
+    return paginated_response(ProductRead, items=items, total=total, page=page, size=size)
 
 
 @router.patch(
