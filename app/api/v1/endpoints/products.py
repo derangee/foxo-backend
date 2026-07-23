@@ -30,6 +30,30 @@ async def create_product(
 
 
 @router.get(
+    "/low-stock",
+    response_model=APIResponse[Page[ProductRead]],
+    summary="List products at or below a stock threshold",
+)
+async def low_stock(
+    threshold: int = Query(10, ge=0, description="Alert when quantity <= threshold"),
+    page: int = Query(1, ge=1, description="1-based page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    active_only: bool = Query(True, description="Only include active products"),
+    service: ProductService = Depends(get_product_service),
+) -> APIResponse[Page[ProductRead]]:
+    items, total = await service.low_stock(
+        threshold=threshold, page=page, size=size, active_only=active_only
+    )
+    page_data = Page.create(
+        items=[ProductRead.model_validate(item) for item in items],
+        total=total,
+        page=page,
+        size=size,
+    )
+    return APIResponse(data=page_data)
+
+
+@router.get(
     "/{product_id}",
     response_model=APIResponse[ProductRead],
     summary="Get a product by id",
@@ -87,3 +111,29 @@ async def delete_product(
     service: ProductService = Depends(get_product_service),
 ) -> None:
     await service.delete(product_id)
+
+
+@router.post(
+    "/{product_id}/deactivate",
+    response_model=APIResponse[ProductRead],
+    summary="Deactivate a product",
+)
+async def deactivate_product(
+    product_id: int,
+    service: ProductService = Depends(get_product_service),
+) -> APIResponse[ProductRead]:
+    product = await service.set_active(product_id, active=False)
+    return APIResponse(message="Product deactivated", data=ProductRead.model_validate(product))
+
+
+@router.post(
+    "/{product_id}/activate",
+    response_model=APIResponse[ProductRead],
+    summary="Activate a product",
+)
+async def activate_product(
+    product_id: int,
+    service: ProductService = Depends(get_product_service),
+) -> APIResponse[ProductRead]:
+    product = await service.set_active(product_id, active=True)
+    return APIResponse(message="Product activated", data=ProductRead.model_validate(product))

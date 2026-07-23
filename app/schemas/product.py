@@ -24,14 +24,22 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
-    """Partial update. Only provided fields are changed."""
+    """Partial update. Only provided fields are changed.
+
+    Activation state is not changed here; use the activate/deactivate endpoints.
+    """
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
-    is_active: bool | None = None
+    expected_version: int | None = Field(
+        default=None,
+        ge=1,
+        description="If provided, the update fails with 409 unless it matches the "
+        "product's current version (optimistic locking).",
+    )
 
 
 class ProductRead(BaseModel):
@@ -44,5 +52,6 @@ class ProductRead(BaseModel):
     price: Decimal
     quantity: int
     is_active: bool
+    version: int
     created_at: datetime
     updated_at: datetime

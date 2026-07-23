@@ -57,6 +57,20 @@ class InsufficientStockError(ConflictError):
         )
 
 
+class OptimisticLockError(ConflictError):
+    error_code = "version_conflict"
+
+    def __init__(self, product_id: int, expected: int | None = None, actual: int | None = None):
+        if expected is not None and actual is not None:
+            message = (
+                f"Product {product_id} version conflict: expected version "
+                f"{expected} but current version is {actual}."
+            )
+        else:
+            message = f"Product {product_id} was modified by a concurrent request."
+        super().__init__(message=message)
+
+
 class ProductHasMovementsError(ConflictError):
     error_code = "product_has_movements"
 

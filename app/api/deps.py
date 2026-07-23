@@ -18,7 +18,11 @@ from app.services.stock_movement import StockMovementService
 def get_product_service(
     session: AsyncSession = Depends(get_session),
 ) -> ProductService:
-    return ProductService(session, ProductRepository(session))
+    return ProductService(
+        session,
+        ProductRepository(session),
+        StockMovementRepository(session),
+    )
 
 
 def get_stock_movement_service(

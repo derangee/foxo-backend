@@ -51,5 +51,19 @@ class ProductRepository:
         result = await self._session.execute(query.order_by(Product.id).limit(limit).offset(offset))
         return result.scalars().all(), int(total or 0)
 
+    async def list_low_stock(
+        self, *, threshold: int, limit: int, offset: int, active_only: bool = True
+    ) -> tuple[Sequence[Product], int]:
+        query = select(Product).where(Product.quantity <= threshold)
+        if active_only:
+            query = query.where(Product.is_active.is_(True))
+
+        total = await self._session.scalar(select(func.count()).select_from(query.subquery()))
+        # Most urgent (lowest stock) first, stable tie-break by id.
+        result = await self._session.execute(
+            query.order_by(Product.quantity.asc(), Product.id.asc()).limit(limit).offset(offset)
+        )
+        return result.scalars().all(), int(total or 0)
+
     async def delete(self, product: Product) -> None:
         await self._session.delete(product)

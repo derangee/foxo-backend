@@ -7,7 +7,7 @@ service owns the transaction.
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import MovementType
@@ -20,6 +20,13 @@ class StockMovementRepository:
 
     def add(self, movement: StockMovement) -> None:
         self._session.add(movement)
+
+    async def exists_for_product(self, product_id: int) -> bool:
+        return bool(
+            await self._session.scalar(
+                select(exists().where(StockMovement.product_id == product_id))
+            )
+        )
 
     async def list_by_product(
         self,

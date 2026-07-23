@@ -36,6 +36,9 @@ class Product(TimestampMixin, Base):
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, server_default=text("0"))
     quantity: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    # Optimistic-lock counter: SQLAlchemy increments it on every UPDATE and adds
+    # "WHERE version = <old>" so a concurrent write is detected (StaleDataError).
+    version: Mapped[int] = mapped_column(nullable=False, server_default=text("1"))
 
     movements: Mapped[list[StockMovement]] = relationship(
         back_populates="product",
@@ -43,6 +46,8 @@ class Product(TimestampMixin, Base):
         # (enforced by the FK's RESTRICT and the service layer).
         passive_deletes="all",
     )
+
+    __mapper_args__ = {"version_id_col": version}
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<Product id={self.id} sku={self.sku!r} qty={self.quantity}>"
