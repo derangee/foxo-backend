@@ -6,6 +6,8 @@ movements against the same product are serialized with a row-level lock, so the
 read-modify-write of the quantity cannot lose updates or oversell.
 """
 
+from collections.abc import Sequence
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +43,29 @@ class StockMovementService:
     async def adjust(self, product_id: int, quantity_change: int, reason: str) -> StockMovement:
         return await self._apply_movement(
             product_id, MovementType.ADJUSTMENT, quantity_change, reason
+        )
+
+    async def history(
+        self,
+        product_id: int,
+        *,
+        page: int,
+        size: int,
+        movement_type: MovementType | None = None,
+        ascending: bool = False,
+    ) -> tuple[Sequence[StockMovement], int]:
+        # Fail fast with a 404 if the product does not exist, rather than
+        # returning an empty page that hides a bad id.
+        if await self._products.get_by_id(product_id) is None:
+            raise ProductNotFoundError(product_id)
+
+        offset = (page - 1) * size
+        return await self._movements.list_by_product(
+            product_id,
+            limit=size,
+            offset=offset,
+            movement_type=movement_type,
+            ascending=ascending,
         )
 
     async def _apply_movement(
